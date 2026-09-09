@@ -1,0 +1,14 @@
+---
+name: grasshopper-runtime-visualizer
+version: 0.1.0
+authors:
+- Timo Harboe
+description: >
+  Local Grasshopper runtime recorder and browser heatmap visualizer for diagnosing
+  expiration chains, unexpected recomputation and frozen-canvas sessions.
+keywords:
+- grasshopper
+- runtime
+- visualizer
+- debugger
+- guid:7c7b8348-4b70-4731-82d4-bd78e63be5c5

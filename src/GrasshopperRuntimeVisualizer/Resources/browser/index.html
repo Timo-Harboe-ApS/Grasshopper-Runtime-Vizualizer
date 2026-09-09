@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grasshopper Runtime Visualizer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f3ee;
+      --panel: #ffffff;
+      --ink: #202124;
+      --muted: #6d706f;
+      --line: #d9d6cd;
+      --wire: #94918a;
+      --accent: #1c7c78;
+      --hot: #e84f35;
+      --warm: #f1a12b;
+      --cool: #e9e6dc;
+      --dark: #2c3333;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--ink);
+      font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: 52px 1fr 86px;
+      height: 100vh;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfaf7;
+    }
+
+    .brand {
+      min-width: 240px;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1.15;
+      max-width: 520px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      min-width: 220px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .dot.live { background: #2fa56f; }
+    .dot.interrupted { background: var(--hot); }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button, select, input[type="number"] {
+      height: 30px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 0 10px;
+      font: inherit;
+    }
+
+    input[type="number"] {
+      width: 74px;
+      padding: 0 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .field {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    button:hover { border-color: #b9b5aa; }
+    button.primary { background: var(--dark); color: #fff; border-color: var(--dark); }
+
+    main {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(32, 33, 36, 0.055) 1px, transparent 1px),
+        linear-gradient(rgba(32, 33, 36, 0.055) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    svg.dragging { cursor: grabbing; }
+
+    .wire {
+      fill: none;
+      stroke: var(--wire);
+      stroke-width: 2;
+      opacity: 0.55;
+    }
+
+    .group {
+      fill: rgba(28, 124, 120, 0.08);
+      stroke: rgba(28, 124, 120, 0.35);
+      stroke-width: 2;
+    }
+
+    .node rect.body {
+      stroke: #77746e;
+      stroke-width: 1.2;
+      rx: 6;
+    }
+
+    .node.hot rect.body {
+      stroke: var(--hot);
+      stroke-width: 2.4;
+    }
+
+    .node.selected rect.body {
+      stroke: var(--accent);
+      stroke-width: 3;
+    }
+
+    .node text {
+      pointer-events: none;
+      font-size: 12px;
+      fill: #1f2323;
+    }
+
+    .param-node circle {
+      fill: #fbfaf7;
+      stroke: #57544e;
+      stroke-width: 1.5;
+    }
+
+    .param-node.hot circle {
+      fill: var(--hot);
+      stroke: #8f2b1f;
+    }
+
+    .param-node.selected circle {
+      stroke: var(--accent);
+      stroke-width: 3;
+    }
+
+    .count-badge rect {
+      fill: #202124;
+      stroke: #ffffff;
+      stroke-width: 1.5;
+      rx: 8;
+    }
+
+    .count-badge text {
+      fill: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    .blink,
+    .blink rect,
+    .blink circle {
+      fill: none;
+      stroke: #ffffff;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .change-blink,
+    .change-blink rect,
+    .change-blink circle {
+      fill: none;
+      stroke: var(--accent);
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .panel-title {
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .metric {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid #efede7;
+    }
+
+    .metric span:first-child { color: var(--muted); }
+
+    .timeline {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--line);
+      background: #fbfaf7;
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 14px;
+      align-items: center;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .time-readout {
+      min-width: 128px;
+      text-align: right;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .settings-menu {
+      position: relative;
+    }
+
+    .settings-panel {
+      position: absolute;
+      left: 0;
+      bottom: 38px;
+      width: 220px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 10px 26px rgba(32, 33, 36, 0.18);
+      z-index: 5;
+    }
+
+    .settings-panel.hidden {
+      display: none;
+    }
+
+    .settings-panel .field {
+      width: 100%;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .settings-panel .field:last-child {
+      margin-bottom: 0;
+    }
+
+    .warning {
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid #f2b6a9;
+      background: #fff4f1;
+      border-radius: 6px;
+      color: #8f2b1f;
+    }
+
+    .empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    @media (max-width: 860px) {
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: 92px 1fr 96px;
+      }
+
+      header { align-items: flex-start; flex-direction: column; }
+      .brand, .status { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">Grasshopper Runtime Visualizer <small id="versionText">Version loading</small></div>
+      <div class="status"><span id="statusDot" class="dot"></span><span id="statusText">Loading latest session</span></div>
+      <div class="toolbar">
+        <button id="fitBtn">Fit</button>
+        <button id="lastBtn" class="primary">Last Activity</button>
+      </div>
+    </header>
+
+    <main>
+      <svg id="canvas" aria-label="Runtime heat canvas"></svg>
+      <div id="empty" class="empty">No recording loaded</div>
+    </main>
+
+    <div class="timeline">
+      <div class="toolbar">
+        <button id="liveBtn">Live</button>
+        <button id="playBtn" class="primary">Play</button>
+        <button id="prevBtn">Event -</button>
+        <button id="nextBtn">Event +</button>
+        <select id="speedSelect">
+          <option value="0.1">0.1x</option>
+          <option value="0.25" selected>0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="1">1x</option>
+          <option value="2">2x</option>
+        </select>
+        <div class="settings-menu">
+          <button id="settingsBtn">Settings</button>
+          <div id="settingsPanel" class="settings-panel hidden">
+            <label class="field">Blink delay <input id="blinkDelayInput" type="number" min="0" step="0.1" value="0"> ms</label>
+            <label class="field">Wires <input id="showWiresInput" type="checkbox" checked></label>
+            <label class="field">Counts <input id="showCountsInput" type="checkbox"></label>
+          </div>
+        </div>
+      </div>
+      <input id="scrubber" type="range" min="0" max="0" step="0.001" value="0">
+      <div id="timeReadout" class="time-readout">0.000 / 0.000 s</div>
+    </div>
+  </div>
+
+  <script>
+    const settings = {
+      activityWindowSeconds: 5,
+      heatCooldownSeconds: 1,
+      heatDecaySeconds: 0.25,
+      heatCullThreshold: 0.02,
+      heatSaturation: 1,
+      blinkDelayMs: 0,
+      blinkDurationSeconds: 0.18,
+      showCounts: false
+    };
+
+    const state = {
+      session: null,
+      metadata: null,
+      appInfo: null,
+      graph: null,
+      events: [],
+      heat: new Map(),
+      selected: null,
+      view: { x: 0, y: 0, w: 1200, h: 800 },
+      playing: false,
+      live: true,
+      speed: 0.25,
+      showWires: true,
+      position: 0,
+      visualEvents: [],
+      blinkScheduleDirty: true,
+      liveAnchor: { eventTime: 0, performanceTime: performance.now() },
+      lastFrame: performance.now()
+    };
+
+    const svg = document.getElementById("canvas");
+    const empty = document.getElementById("empty");
+    const scrubber = document.getElementById("scrubber");
+    const timeReadout = document.getElementById("timeReadout");
+    const inspector = document.getElementById("inspector");
+    const inspectTitle = document.getElementById("inspectTitle");
+    const statusText = document.getElementById("statusText");
+    const statusDot = document.getElementById("statusDot");
+    const versionText = document.getElementById("versionText");
+    const settingsPanel = document.getElementById("settingsPanel");
+
+    document.getElementById("fitBtn").onclick = () => fit();
+    document.getElementById("lastBtn").onclick = () => jumpLastActivity();
+    document.getElementById("settingsBtn").onclick = () => settingsPanel.classList.toggle("hidden");
+    document.getElementById("showWiresInput").onchange = e => {
+      state.showWires = e.target.checked;
+      render();
+    };
+    document.getElementById("showCountsInput").onchange = e => {
+      settings.showCounts = e.target.checked;
+      updateControls();
+      render();
+    };
+    document.getElementById("liveBtn").onclick = () => {
+      state.live = true;
+      state.playing = false;
+      state.position = duration();
+      resetLiveAnchor(performance.now(), state.position);
+      updateControls();
+      render();
+    };
+    document.getElementById("playBtn").onclick = () => { state.live = false; state.playing = !state.playing; updateControls(); };
+    document.getElementById("prevBtn").onclick = () => stepEvent(-1);
+    document.getElementById("nextBtn").onclick = () => stepEvent(1);
+    document.getElementById("speedSelect").onchange = e => { state.speed = Number(e.target.value); };
+    document.getElementById("blinkDelayInput").oninput = e => {
+      settings.blinkDelayMs = Math.max(0, Number(e.target.value) || 0);
+      state.blinkScheduleDirty = true;
+      scrubber.max = String(timelineDuration());
+      render();
+    };
+    scrubber.oninput = e => { state.live = false; state.playing = false; state.position = Number(e.target.value); updateControls(); render(); };
+
+    let drag = null;
+    svg.addEventListener("pointerdown", event => {
+      if (event.target.closest(".node")) return;
+      drag = { x: event.clientX, y: event.clientY, view: { ...state.view } };
+      svg.classList.add("dragging");
+      svg.setPointerCapture(event.pointerId);
+    });
+    svg.addEventListener("pointermove", event => {
+      if (!drag) return;
+      const scaleX = state.view.w / svg.clientWidth;
+      const scaleY = state.view.h / svg.clientHeight;
+      state.view.x = drag.view.x - (event.clientX - drag.x) * scaleX;
+      state.view.y = drag.view.y - (event.clientY - drag.y) * scaleY;
+      render();
+    });
+    svg.addEventListener("pointerup", event => {
+      drag = null;
+      svg.classList.remove("dragging");
+      try { svg.releasePointerCapture(event.pointerId); } catch {}
+    });
+    svg.addEventListener("wheel", event => {
+      event.preventDefault();
+      const factor = event.deltaY < 0 ? 0.9 : 1.1;
+      const mx = state.view.x + state.view.w * (event.offsetX / svg.clientWidth);
+      const my = state.view.y + state.view.h * (event.offsetY / svg.clientHeight);
+      state.view.w *= factor;
+      state.view.h *= factor;
+      state.view.x = mx - state.view.w * (event.offsetX / svg.clientWidth);
+      state.view.y = my - state.view.h * (event.offsetY / svg.clientHeight);
+      render();
+    }, { passive: false });
+
+    async function loadLatest() {
+      state.appInfo = await fetchJson("/api/debug?_=" + Date.now()).catch(() => null);
+      const latest = await fetchJson("/api/session/latest?_=" + Date.now());
+      if (!latest.session) {
+        setStatus("No sessions found", false);
+        updateVersionText();
+        return;
+      }
+
+      state.session = latest.session;
+      state.metadata = await fetchJson(latest.metadataUrl + "?_=" + Date.now()).catch(() => null);
+      state.graph = await fetchJson(latest.graphUrl + "?_=" + Date.now());
+      state.events = await fetchText(latest.eventsUrl + "?_=" + Date.now())
+        .then(parseJsonLines)
+        .catch(() => []);
+      state.position = duration();
+      state.live = state.metadata?.status === "recording";
+      state.playing = false;
+      state.blinkScheduleDirty = true;
+      resetLiveAnchor(performance.now(), state.position);
+      scrubber.max = String(timelineDuration());
+      fit();
+      connectWs();
+      updateControls();
+      updateVersionText();
+      render();
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(response.statusText);
+      return await response.json();
+    }
+
+    async function fetchText(url) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(response.statusText);
+      return await response.text();
+    }
+
+    function parseJsonLines(text) {
+      const events = [];
+      for (const line of text.split(/\n+/)) {
+        if (!line.trim()) continue;
+        try {
+          events.push(JSON.parse(line));
+        } catch {
+          // Live recordings can expose a partially written final line.
+        }
+      }
+      return events;
+    }
+
+    function connectWs() {
+      const wsUrl = "ws://" + location.host + "/ws";
+      const socket = new WebSocket(wsUrl);
+      socket.onmessage = event => {
+        const evt = JSON.parse(event.data);
+        if (evt.session && state.session && evt.session !== state.session) {
+          loadLatest();
+          return;
+        }
+
+        state.events.push(evt);
+        state.blinkScheduleDirty = true;
+        resetLiveAnchor(performance.now(), Number(evt.t ?? duration()));
+        scrubber.max = String(timelineDuration());
+        if (!state.live) render();
+      };
+    }
+
+    function duration() {
+      return state.events.length ? state.events[state.events.length - 1].t : 0;
+    }
+
+    function timelineDuration() {
+      rebuildBlinkSchedule();
+      const lastBlink = state.visualEvents.length
+        ? state.visualEvents[state.visualEvents.length - 1].visualT + settings.blinkDurationSeconds
+        : 0;
+      return Math.max(duration(), lastBlink, state.live ? state.position : 0);
+    }
+
+    function resetLiveAnchor(now, eventTime) {
+      state.liveAnchor = { eventTime, performanceTime: now };
+    }
+
+    function fit() {
+      if (!state.graph || !state.graph.objects.length) return;
+      const bounds = state.graph.objects
+        .map(o => normalizeBounds(o.bounds))
+        .filter(b => b.width > 0 && b.height > 0);
+      if (!bounds.length) return;
+      const minX = Math.min(...bounds.map(b => b.x));
+      const minY = Math.min(...bounds.map(b => b.y));
+      const maxX = Math.max(...bounds.map(b => b.x + b.width));
+      const maxY = Math.max(...bounds.map(b => b.y + b.height));
+      const pad = 120;
+      state.view = { x: minX - pad, y: minY - pad, w: Math.max(400, maxX - minX + pad * 2), h: Math.max(300, maxY - minY + pad * 2) };
+      render();
+    }
+
+    function normalizeBounds(bounds) {
+      return {
+        x: Number(bounds?.x ?? 0),
+        y: Number(bounds?.y ?? 0),
+        width: Math.max(64, Number(bounds?.width ?? 90)),
+        height: Math.max(28, Number(bounds?.height ?? 40))
+      };
+    }
+
+    function updateHeatAt(time) {
+      rebuildBlinkSchedule();
+      state.heat.clear();
+      let lastT = 0;
+      for (const evt of state.visualEvents) {
+        if (evt.visualT > time) break;
+        decay(evt.visualT - lastT);
+        lastT = evt.visualT;
+        state.heat.set(evt.object, (state.heat.get(evt.object) || 0) + 1);
+      }
+      decay(time - lastT);
+    }
+
+    function decay(dt) {
+      if (dt <= 0) return;
+      const factor = Math.exp(-dt / settings.heatDecaySeconds);
+      for (const [id, heat] of state.heat) {
+        const next = heat * factor;
+        if (next < settings.heatCullThreshold) state.heat.delete(id);
+        else state.heat.set(id, next);
+      }
+    }
+
+    function expirationCountsAt(time) {
+      rebuildBlinkSchedule();
+      const counts = new Map();
+
+      for (const evt of state.visualEvents) {
+        if (evt.visualT > time) break;
+        counts.set(evt.object, (counts.get(evt.object) || 0) + 1);
+      }
+
+      return counts;
+    }
+
+    function rawExpirationCountsAt(time) {
+      const counts = new Map();
+
+      for (const evt of state.events) {
+        if (evt.t > time) break;
+        if (evt.type !== "expire" || !evt.object) continue;
+        counts.set(evt.object, (counts.get(evt.object) || 0) + 1);
+      }
+
+      return counts;
+    }
+
+    function recentExpirationCountsAt(time) {
+      rebuildBlinkSchedule();
+      const counts = new Map();
+      const windowStart = Math.max(0, time - settings.activityWindowSeconds);
+
+      for (const evt of state.visualEvents) {
+        if (evt.visualT > time) break;
+        if (evt.visualT < windowStart) continue;
+        counts.set(evt.object, (counts.get(evt.object) || 0) + 1);
+      }
+
+      return counts;
+    }
+
+    function rebuildBlinkSchedule() {
+      if (!state.blinkScheduleDirty) return;
+
+      const minGap = settings.blinkDelayMs / 1000;
+      const visualEvents = [];
+      const visualEventType = state.events.some(evt => evt.type === "canvas_expire")
+        ? "canvas_expire"
+        : "expire";
+      let previousRaw = null;
+      let previousVisual = null;
+
+      for (const evt of state.events) {
+        if (evt.type !== visualEventType || !evt.object) continue;
+
+        const raw = Number(evt.t);
+        let visualT = raw;
+
+        if (previousRaw !== null && previousVisual !== null) {
+          const rawGap = raw - previousRaw;
+
+          if (raw === previousRaw) {
+            visualT = previousVisual;
+          } else if (minGap > 0 && rawGap > 0 && rawGap < minGap) {
+            visualT = previousVisual + minGap;
+          } else if (raw < previousVisual) {
+            visualT = previousVisual;
+          }
+        }
+
+        visualEvents.push({ object: evt.object, rawT: raw, visualT });
+        previousRaw = raw;
+        previousVisual = visualT;
+      }
+
+      state.visualEvents = visualEvents;
+      state.blinkScheduleDirty = false;
+    }
+
+    function activeBlinksAt(time) {
+      rebuildBlinkSchedule();
+      const blinks = new Map();
+
+      for (const evt of state.visualEvents) {
+        if (evt.visualT > time) break;
+
+        const age = time - evt.visualT;
+        if (age < 0 || age > settings.blinkDurationSeconds) continue;
+
+        const strength = 1 - age / settings.blinkDurationSeconds;
+        blinks.set(evt.object, Math.max(blinks.get(evt.object) || 0, strength));
+      }
+
+      return blinks;
+    }
+
+    function activeChangesAt(time) {
+      const changes = new Map();
+
+      for (const evt of state.events) {
+        if (evt.t > time) break;
+        if (evt.type !== "object_changed" || !evt.object) continue;
+
+        const age = time - evt.t;
+        if (age < 0 || age > settings.blinkDurationSeconds) continue;
+
+        const strength = 1 - age / settings.blinkDurationSeconds;
+        changes.set(evt.object, Math.max(changes.get(evt.object) || 0, strength));
+      }
+
+      return changes;
+    }
+
+    function objectChangeCountsAt(time) {
+      const counts = new Map();
+
+      for (const evt of state.events) {
+        if (evt.t > time) break;
+        if (evt.type !== "object_changed" || !evt.object) continue;
+        counts.set(evt.object, (counts.get(evt.object) || 0) + 1);
+      }
+
+      return counts;
+    }
+
+    function render() {
+      empty.style.display = state.graph ? "none" : "grid";
+      svg.setAttribute("viewBox", `${state.view.x} ${state.view.y} ${state.view.w} ${state.view.h}`);
+      svg.innerHTML = "";
+      if (!state.graph) {
+        renderInspector();
+        return;
+      }
+
+      updateHeatAt(state.position);
+      const expirationCounts = expirationCountsAt(state.position);
+      const objectMap = new Map(state.graph.objects.map(o => [o.id, o]));
+      const paramMap = new Map((state.graph.parameters || []).map(p => [p.id, p]));
+      const componentHeat = state.heat;
+      const componentCounts = expirationCounts;
+      const rawBlinks = activeBlinksAt(state.position);
+      const componentBlinks = rawBlinks;
+      const changeBlinks = activeChangesAt(state.position);
+
+      for (const group of state.graph.groups || []) {
+        const b = normalizeBounds(group.bounds);
+        append("rect", { class: "group", x: b.x, y: b.y, width: b.width, height: b.height, rx: 8 });
+      }
+
+      if (state.showWires) {
+        for (const wire of state.graph.connections || []) {
+          const a = objectMap.get(wire.sourceObject);
+          const b = objectMap.get(wire.targetObject);
+          if (!a || !b) continue;
+          const source = endpointForParam(paramMap.get(wire.sourceParam), a, "source");
+          const target = endpointForParam(paramMap.get(wire.targetParam), b, "target");
+          const x1 = source.x;
+          const y1 = source.y;
+          const x2 = target.x;
+          const y2 = target.y;
+          const c = Math.max(48, Math.abs(x2 - x1) * 0.45);
+          append("path", { class: "wire", d: `M ${x1} ${y1} C ${x1 + c} ${y1}, ${x2 - c} ${y2}, ${x2} ${y2}` });
+        }
+      }
+
+      for (const obj of state.graph.objects) {
+        const b = normalizeBounds(obj.bounds);
+        const heat = componentHeat.get(obj.id) || 0;
+        const count = componentCounts.get(obj.id) || 0;
+        const fill = heatColor(heat);
+        const g = append("g", { class: "node" + (heat > 0.55 ? " hot" : "") + (state.selected === obj.id ? " selected" : ""), transform: `translate(${b.x} ${b.y})` });
+        const rect = child(g, "rect", { class: "body", x: 0, y: 0, width: b.width, height: b.height, fill });
+        g.addEventListener("click", () => { state.selected = obj.id; render(); });
+        child(g, "text", { x: 10, y: Math.min(22, b.height - 8) }).textContent = trimLabel(obj.nickname || obj.name, Math.floor(b.width / 7));
+
+        if (settings.showCounts && count > 0) {
+          const label = count > 999 ? "999+" : String(count);
+          const badgeWidth = Math.max(22, label.length * 7 + 12);
+          const badge = child(g, "g", { class: "count-badge", transform: `translate(${b.width - badgeWidth - 5} 5)` });
+          child(badge, "rect", { x: 0, y: 0, width: badgeWidth, height: 18 });
+          child(badge, "text", { x: badgeWidth / 2, y: 9 }).textContent = label;
+        }
+      }
+
+      for (const param of state.graph.parameters || []) {
+        if (param.kind === "loose") continue;
+        const owner = objectMap.get(param.ownerObject);
+        if (!owner) continue;
+
+        const point = endpointForParam(param, owner, param.kind === "output" ? "source" : "target");
+        const heat = state.heat.get(param.id) || 0;
+        const count = expirationCounts.get(param.id) || 0;
+        const g = append("g", { class: "param-node" + (heat > 0.55 ? " hot" : "") + (state.selected === param.id ? " selected" : "") });
+        child(g, "circle", { cx: point.x, cy: point.y, r: count > 0 ? 5 : 4 });
+        g.addEventListener("click", () => { state.selected = param.id; render(); });
+
+        if (settings.showCounts && count > 0) {
+          const label = count > 99 ? "99+" : String(count);
+          const badgeWidth = Math.max(18, label.length * 7 + 10);
+          const badge = child(g, "g", { class: "count-badge", transform: `translate(${point.x - badgeWidth / 2} ${point.y - 24})` });
+          child(badge, "rect", { x: 0, y: 0, width: badgeWidth, height: 16 });
+          child(badge, "text", { x: badgeWidth / 2, y: 8 }).textContent = label;
+        }
+      }
+
+      for (const obj of state.graph.objects) {
+        const strength = componentBlinks.get(obj.id) || 0;
+        if (strength <= 0) continue;
+
+        const b = normalizeBounds(obj.bounds);
+        const pad = 5 + strength * 8;
+        append("rect", {
+          class: "blink",
+          x: b.x - pad,
+          y: b.y - pad,
+          width: b.width + pad * 2,
+          height: b.height + pad * 2,
+          rx: 8,
+          opacity: 0.2 + strength * 0.8,
+          "stroke-width": 2 + strength * 4
+        });
+      }
+
+      for (const obj of state.graph.objects) {
+        const strength = changeBlinks.get(obj.id) || 0;
+        if (strength <= 0) continue;
+
+        const b = normalizeBounds(obj.bounds);
+        const pad = 3 + strength * 5;
+        append("rect", {
+          class: "change-blink",
+          x: b.x - pad,
+          y: b.y - pad,
+          width: b.width + pad * 2,
+          height: b.height + pad * 2,
+          rx: 8,
+          opacity: 0.25 + strength * 0.65,
+          "stroke-width": 1.5 + strength * 3
+        });
+      }
+
+      for (const [id, strength] of rawBlinks) {
+        const param = paramMap.get(id);
+        if (!param || param.kind === "loose") continue;
+
+        const owner = objectMap.get(param.ownerObject);
+        if (!owner) continue;
+
+        const point = endpointForParam(param, owner, param.kind === "output" ? "source" : "target");
+        append("circle", {
+          class: "blink",
+          cx: point.x,
+          cy: point.y,
+          r: 8 + strength * 10,
+          opacity: 0.25 + strength * 0.75,
+          "stroke-width": 2 + strength * 3
+        });
+      }
+
+      renderInspector();
+      updateReadout();
+    }
+
+    function endpointForParam(param, owner, role) {
+      const ownerBounds = normalizeBounds(owner.bounds);
+      const grip = role === "source" ? param?.outputGrip : param?.inputGrip;
+      const ownedEdgeX = role === "source" ? ownerBounds.x + ownerBounds.width : ownerBounds.x;
+
+      if (hasRealPoint(grip)) {
+        return {
+          x: param?.kind === "loose" ? Number(grip.x) : ownedEdgeX,
+          y: Number(grip.y)
+        };
+      }
+
+      if (param && hasRealBounds(param.bounds)) {
+        const paramBounds = normalizeBounds(param.bounds);
+        return {
+          x: param.kind === "loose" ? paramBounds.x + (role === "source" ? paramBounds.width : 0) : ownedEdgeX,
+          y: paramBounds.y + paramBounds.height / 2
+        };
+      }
+
+      const isSource = role === "source" || param?.kind === "output";
+      return {
+        x: isSource ? ownerBounds.x + ownerBounds.width : ownerBounds.x,
+        y: fallbackParamY(ownerBounds, Number(param?.index ?? 0))
+      };
+    }
+
+    function hasRealBounds(bounds) {
+      return Number(bounds?.width ?? 0) > 8 && Number(bounds?.height ?? 0) > 8;
+    }
+
+    function hasRealPoint(point) {
+      return Number.isFinite(Number(point?.x)) && Number.isFinite(Number(point?.y));
+    }
+
+    function fallbackParamY(bounds, index) {
+      const first = bounds.y + Math.min(18, bounds.height / 2);
+      const y = first + index * 16;
+      return Math.min(bounds.y + bounds.height - 8, Math.max(bounds.y + 8, y));
+    }
+
+    function heatColor(heat) {
+      const clamped = Math.min(1, heat / settings.heatSaturation);
+      if (clamped <= 0) return "#f0eee7";
+      const r = Math.round(240 + (232 - 240) * clamped);
+      const g = Math.round(238 + (79 - 238) * clamped);
+      const b = Math.round(231 + (53 - 231) * clamped);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function trimLabel(text, max) {
+      if (!text) return "";
+      if (text.length <= max) return text;
+      return text.slice(0, Math.max(3, max - 1)) + "...";
+    }
+
+    function append(tag, attrs) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+      svg.appendChild(el);
+      return el;
+    }
+
+    function child(parent, tag, attrs) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+      parent.appendChild(el);
+      return el;
+    }
+
+    function renderInspector() {
+      if (!inspector || !inspectTitle) return;
+
+      if (!state.graph) {
+        inspectTitle.textContent = "Session";
+        inspector.innerHTML = "<div class='metric'><span>Status</span><strong>No recording</strong></div>";
+        return;
+      }
+
+      const incomplete = hasIncompleteSolution();
+      const selected = state.graph.objects.find(o => o.id === state.selected);
+      if (!selected) {
+        inspectTitle.textContent = state.session || "Session";
+        inspector.innerHTML = [
+          metric("Status", state.metadata?.status || (state.live ? "recording" : "loaded")),
+          metric("Server version", state.appInfo?.pluginVersion || "unknown"),
+          metric("Session version", state.metadata?.pluginVersion || "unknown"),
+          metric("Recorder model", state.metadata?.recorderModel || "unknown"),
+          metric("Objects", state.graph.objects.length),
+          metric("Connections", state.graph.connections.length),
+          metric("Events", state.events.length),
+          metric("Current time", state.position.toFixed(3) + " s"),
+          metric("Heat window", settings.activityWindowSeconds + " s"),
+          metric("Canvas counts", settings.showCounts ? "shown" : "hidden"),
+          metric("Count source", state.events.some(evt => evt.type === "canvas_expire") ? "canvas_expire" : "raw expire"),
+          metric("Cooldown", "~" + settings.heatCooldownSeconds + " s"),
+          metric("Blink delay", settings.blinkDelayMs + " ms"),
+          incomplete ? "<div class='warning'>Incomplete solution: a solution started without a matching end event before recording stopped.</div>" : ""
+        ].join("");
+        return;
+      }
+
+      const selectedParam = (state.graph.parameters || []).find(p => p.id === state.selected);
+      if (selectedParam && !selected) {
+        const owner = state.graph.objects.find(o => o.id === selectedParam.ownerObject);
+        const recentCounts = recentExpirationCountsAt(state.position);
+        const rawCounts = rawExpirationCountsAt(state.position);
+        const last = [...state.events].reverse().find(e => e.object === selectedParam.id);
+        inspectTitle.textContent = selectedParam.nickname || selectedParam.name;
+        inspector.innerHTML = [
+          metric("Kind", selectedParam.kind),
+          metric("Owner", owner ? (owner.nickname || owner.name) : "none"),
+          metric("Canvas expirations", expirationCountsAt(state.position).get(selectedParam.id) || 0),
+          metric("Raw callbacks", rawCounts.get(selectedParam.id) || 0),
+          metric(`Visible expirations, last ${settings.activityWindowSeconds}s`, recentCounts.get(selectedParam.id) || 0),
+          metric("Heat", (state.heat.get(selectedParam.id) || 0).toFixed(2)),
+          metric("Last raw event", last ? last.t.toFixed(6) + " s" : "none")
+        ].join("");
+        return;
+      }
+
+      const selectedIds = new Set([selected.id]);
+      const recentCounts = recentExpirationCountsAt(state.position);
+      const rawCounts = rawExpirationCountsAt(state.position);
+      const changeCounts = objectChangeCountsAt(state.position);
+      const last = [...state.events].reverse().find(e => selectedIds.has(e.object));
+      const lastChange = [...state.events].reverse().find(e => e.type === "object_changed" && selectedIds.has(e.object));
+      inspectTitle.textContent = selected.nickname || selected.name;
+      inspector.innerHTML = [
+        metric("Name", selected.name),
+        metric("Type", shortType(selected.type)),
+        metric("Canvas expirations", expirationCountsAt(state.position).get(selected.id) || 0),
+        metric("Raw callbacks", rawCounts.get(selected.id) || 0),
+        metric("Object changes", changeCounts.get(selected.id) || 0),
+        metric(`Visible expirations, last ${settings.activityWindowSeconds}s`, recentCounts.get(selected.id) || 0),
+        metric("Heat", (state.heat.get(selected.id) || 0).toFixed(2)),
+        metric("Last raw event", last ? last.t.toFixed(6) + " s" : "none"),
+        metric("Last change", lastChange ? `${lastChange.change || "Changed"} at ${lastChange.t.toFixed(6)} s` : "none"),
+        metric("Groups", selected.groupIds?.length || 0)
+      ].join("");
+    }
+
+    function shortType(type) {
+      return String(type || "").split(".").pop();
+    }
+
+    function metric(label, value) {
+      return `<div class="metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}</strong></div>`;
+    }
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+    }
+
+    function hasIncompleteSolution() {
+      let open = false;
+      for (const evt of state.events) {
+        if (evt.type === "solution_start") open = true;
+        if (evt.type === "solution_end") open = false;
+      }
+      return open && state.metadata?.status !== "recording";
+    }
+
+    function updateControls() {
+      document.getElementById("playBtn").textContent = state.playing ? "Pause" : "Play";
+      document.getElementById("showCountsInput").checked = settings.showCounts;
+      document.getElementById("showWiresInput").checked = state.showWires;
+      setStatus(state.live ? "Live" : (state.metadata?.status || "Playback"), state.live);
+      scrubber.max = String(timelineDuration());
+      scrubber.value = String(state.position);
+      updateReadout();
+    }
+
+    function updateVersionText() {
+      const serverVersion = state.appInfo?.pluginVersion || "unknown server";
+      const sessionVersion = state.metadata?.pluginVersion || "unknown session";
+      const model = state.metadata?.recorderModel || "";
+      versionText.textContent = `server ${serverVersion} · session ${sessionVersion}`;
+      versionText.title = model ? `Recorder model: ${model}` : "";
+    }
+
+    function updateReadout() {
+      const end = timelineDuration();
+      timeReadout.textContent = `${state.position.toFixed(3)} / ${end.toFixed(3)} s`;
+      scrubber.max = String(end);
+      scrubber.value = String(Math.min(state.position, end));
+    }
+
+    function setStatus(text, live) {
+      statusText.textContent = text;
+      statusDot.className = "dot" + (live ? " live" : hasIncompleteSolution() ? " interrupted" : "");
+    }
+
+    function jumpLastActivity() {
+      const last = [...state.events].reverse().find(e => e.type === "expire" || e.type === "solution_start" || e.type === "object_changed");
+      if (!last) return;
+      state.live = false;
+      state.playing = false;
+      state.position = last.t;
+      updateControls();
+      render();
+    }
+
+    function stepEvent(direction) {
+      if (!state.events.length) return;
+      state.live = false;
+      state.playing = false;
+      const current = state.events.findIndex(e => e.t >= state.position);
+      const index = Math.max(0, Math.min(state.events.length - 1, current + direction));
+      state.position = state.events[index].t;
+      updateControls();
+      render();
+    }
+
+    function frame(now) {
+      const dt = (now - state.lastFrame) / 1000;
+      state.lastFrame = now;
+      if (state.live) {
+        state.position = Math.max(duration(), state.liveAnchor.eventTime + (now - state.liveAnchor.performanceTime) / 1000);
+        render();
+      } else if (state.playing) {
+        const end = timelineDuration();
+        state.position = Math.min(end, state.position + dt * state.speed);
+        if (state.position >= end) state.playing = false;
+        updateControls();
+        render();
+      }
+      requestAnimationFrame(frame);
+    }
+
+    loadLatest();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

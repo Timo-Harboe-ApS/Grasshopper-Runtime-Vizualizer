@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <TargetExt>.gha</TargetExt>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BuildTimestamp Condition="'$(BuildTimestamp)' == ''">$([System.DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff'))</BuildTimestamp>
+    <YakVersion Condition="'$(YakVersion)' == ''">$([System.DateTime]::UtcNow.ToString('yyyy.Mdd.1HHmmssfff'))</YakVersion>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+    <InformationalVersion>0.1.0+$(BuildTimestamp)</InformationalVersion>
+    <Title>Grasshopper Runtime Visualizer</Title>
+    <Company>Timo Harboe</Company>
+    <Description>Local Grasshopper runtime recorder and browser heatmap visualizer.</Description>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grasshopper" Version="8.33.26188.13001" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/browser/index.html" LogicalName="GrasshopperRuntimeVisualizer.Resources.browser.index.html" />
+    <None Include="Resources/browser/**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <YakManifestLine Include="---" />
+    <YakManifestLine Include="name: grasshopper-runtime-visualizer" />
+    <YakManifestLine Include="version: $(YakVersion)" />
+    <YakManifestLine Include="authors:" />
+    <YakManifestLine Include="- Timo Harboe" />
+    <YakManifestLine Include="description: Local Grasshopper runtime recorder and browser heatmap visualizer for diagnosing expiration chains, unexpected recomputation and frozen-canvas sessions." />
+    <YakManifestLine Include="keywords:" />
+    <YakManifestLine Include="- grasshopper" />
+    <YakManifestLine Include="- runtime" />
+    <YakManifestLine Include="- visualizer" />
+    <YakManifestLine Include="- debugger" />
+    <YakManifestLine Include="- guid:7c7b8348-4b70-4731-82d4-bd78e63be5c5" />
+  </ItemGroup>
+
+  <Target Name="WriteYakManifest" AfterTargets="Build">
+    <WriteLinesToFile File="$(TargetDir)manifest.yml" Lines="@(YakManifestLine)" Overwrite="true" />
+  </Target>
+</Project>
