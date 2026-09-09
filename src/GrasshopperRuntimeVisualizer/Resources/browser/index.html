@@ -203,6 +203,11 @@
       dominant-baseline: central;
     }
 
+    .heat-halo {
+      fill: #e84f35;
+      pointer-events: none;
+    }
+
     .blink,
     .blink rect,
     .blink circle {
@@ -370,7 +375,9 @@
       heatSaturation: 1,
       blinkDelayMs: 0,
       blinkDurationSeconds: 0.18,
-      showCounts: false
+      showCounts: false,
+      minBlinkPixels: 18,
+      minHaloPixels: 26
     };
 
     const state = {
@@ -742,6 +749,26 @@
       const rawBlinks = activeBlinksAt(state.position);
       const componentBlinks = rawBlinks;
       const changeBlinks = activeChangesAt(state.position);
+      const scale = viewportScale();
+
+      for (const obj of state.graph.objects) {
+        const b = normalizeBounds(obj.bounds);
+        const heat = componentHeat.get(obj.id) || 0;
+        if (heat <= 0) continue;
+
+        const cx = b.x + b.width / 2;
+        const cy = b.y + b.height / 2;
+        const baseRadius = Math.max(b.width, b.height) * 0.72;
+        const minRadius = settings.minHaloPixels * scale;
+        const radius = Math.max(baseRadius, minRadius) * Math.min(1.8, 0.75 + heat * 0.35);
+        append("circle", {
+          class: "heat-halo",
+          cx,
+          cy,
+          r: radius,
+          opacity: Math.min(0.34, 0.08 + heat * 0.13)
+        });
+      }
 
       for (const group of state.graph.groups || []) {
         const b = normalizeBounds(group.bounds);
@@ -809,7 +836,8 @@
         if (strength <= 0) continue;
 
         const b = normalizeBounds(obj.bounds);
-        const pad = 5 + strength * 8;
+        const minPad = Math.max(0, (settings.minBlinkPixels * scale - Math.min(b.width, b.height)) / 2);
+        const pad = Math.max(minPad, 5 + strength * 8);
         append("rect", {
           class: "blink",
           x: b.x - pad,
@@ -827,7 +855,8 @@
         if (strength <= 0) continue;
 
         const b = normalizeBounds(obj.bounds);
-        const pad = 3 + strength * 5;
+        const minPad = Math.max(0, (settings.minBlinkPixels * scale - Math.min(b.width, b.height)) / 2);
+        const pad = Math.max(minPad, 3 + strength * 5);
         append("rect", {
           class: "change-blink",
           x: b.x - pad,
@@ -887,6 +916,12 @@
         x: isSource ? ownerBounds.x + ownerBounds.width : ownerBounds.x,
         y: fallbackParamY(ownerBounds, Number(param?.index ?? 0))
       };
+    }
+
+    function viewportScale() {
+      const sx = state.view.w / Math.max(1, svg.clientWidth || 1);
+      const sy = state.view.h / Math.max(1, svg.clientHeight || 1);
+      return Math.max(sx, sy);
     }
 
     function hasRealBounds(bounds) {

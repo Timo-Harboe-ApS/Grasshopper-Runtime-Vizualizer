@@ -65,6 +65,7 @@ The root page is also embedded into the `.gha` as a fallback, so `/` should stil
 - Expiration badges are hidden by default. Use `Counts` to show cumulative visible canvas expirations for each object at the current timeline position.
 - Heat cooldown is approximately 1 second after the last expiration.
 - Internally the heat curve uses exponential decay with a 0.25 second time constant and drops tiny values below `0.02`. One visible expiration is enough to reach full heat, then the object cools from there.
+- Active objects get a heat halo and minimum screen-size flash, so expiration remains visible when zoomed far out without dimming inactive canvas objects.
 - Live mode advances with the browser animation clock between incoming Grasshopper events, so heat cools continuously even when no new event arrives.
 - `Blink delay` defaults to `0 ms`. Values above zero set a minimum visible gap between near-identical expiration flashes without changing the recorded timestamps. Equal timestamps still flash together.
 - Heat and visible counts follow the delayed visual expiration schedule, so cooldown starts when the delayed blink appears.
