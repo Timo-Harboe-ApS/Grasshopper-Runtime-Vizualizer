@@ -140,20 +140,25 @@
     .wire {
       fill: none;
       stroke: var(--wire);
-      stroke-width: 2;
-      opacity: 0.55;
+      stroke-width: 1.4;
+      opacity: 0.42;
+      vector-effect: non-scaling-stroke;
     }
 
     .group {
-      fill: rgba(28, 124, 120, 0.08);
-      stroke: rgba(28, 124, 120, 0.35);
-      stroke-width: 2;
+      fill: none;
+      stroke: rgba(28, 124, 120, 0.65);
+      stroke-width: 1.5;
+      stroke-dasharray: 8 5;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
     }
 
     .node rect.body {
       stroke: #77746e;
       stroke-width: 1.2;
       rx: 6;
+      vector-effect: non-scaling-stroke;
     }
 
     .node.hot rect.body {
@@ -176,6 +181,7 @@
       fill: #fbfaf7;
       stroke: #57544e;
       stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
     }
 
     .param-node.hot circle {
@@ -208,6 +214,14 @@
       pointer-events: none;
     }
 
+    .heat-ring {
+      fill: none;
+      stroke: var(--hot);
+      stroke-linejoin: round;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+    }
+
     .blink,
     .blink rect,
     .blink circle {
@@ -215,6 +229,7 @@
       stroke: #ffffff;
       stroke-linejoin: round;
       pointer-events: none;
+      vector-effect: non-scaling-stroke;
     }
 
     .change-blink,
@@ -224,6 +239,7 @@
       stroke: var(--accent);
       stroke-linejoin: round;
       pointer-events: none;
+      vector-effect: non-scaling-stroke;
     }
 
     .panel-title {
@@ -751,6 +767,11 @@
       const changeBlinks = activeChangesAt(state.position);
       const scale = viewportScale();
 
+      for (const group of state.graph.groups || []) {
+        const b = normalizeBounds(group.bounds);
+        append("rect", { class: "group", x: b.x, y: b.y, width: b.width, height: b.height, rx: 8 });
+      }
+
       for (const obj of state.graph.objects) {
         const b = normalizeBounds(obj.bounds);
         const heat = componentHeat.get(obj.id) || 0;
@@ -768,11 +789,6 @@
           r: radius,
           opacity: Math.min(0.34, 0.08 + heat * 0.13)
         });
-      }
-
-      for (const group of state.graph.groups || []) {
-        const b = normalizeBounds(group.bounds);
-        append("rect", { class: "group", x: b.x, y: b.y, width: b.width, height: b.height, rx: 8 });
       }
 
       if (state.showWires) {
@@ -808,6 +824,25 @@
           child(badge, "rect", { x: 0, y: 0, width: badgeWidth, height: 18 });
           child(badge, "text", { x: badgeWidth / 2, y: 9 }).textContent = label;
         }
+      }
+
+      for (const obj of state.graph.objects) {
+        const heat = componentHeat.get(obj.id) || 0;
+        if (heat <= 0) continue;
+
+        const b = normalizeBounds(obj.bounds);
+        const minPad = Math.max(0, (settings.minBlinkPixels * scale - Math.min(b.width, b.height)) / 2);
+        const pad = Math.max(minPad, 2 + heat * 4);
+        append("rect", {
+          class: "heat-ring",
+          x: b.x - pad,
+          y: b.y - pad,
+          width: b.width + pad * 2,
+          height: b.height + pad * 2,
+          rx: 8,
+          opacity: Math.min(0.85, 0.22 + heat * 0.48),
+          "stroke-width": 1.4 + heat * 1.8
+        });
       }
 
       for (const param of state.graph.parameters || []) {
